@@ -9,9 +9,8 @@ import (
 	hapi_chart3 "k8s.io/helm/pkg/proto/hapi/chart"
 )
 
-type ResourceScaler struct {
+type AppResourceScaler struct {
 	helmClient *helm.Client
-	//namespace  string
 	releases   []*releaseData
 }
 
@@ -19,20 +18,17 @@ type releaseData struct {
 	chart *hapi_chart3.Chart
 }
 
-func New() *ResourceScaler {
-	//namespace := getenv("RESOURCE_NAMESPACE", "default-tenant")
-
+func New() scaler.ResourceScaler {
 	helmClient := helm.NewClient()
 
-	return &ResourceScaler{
+	return &AppResourceScaler{
 		helmClient: helmClient,
-		//namespace:  namespace,
 		releases:   make([]*releaseData, 0),
 	}
 }
 
 // if last int parameter is 0 -> helm del --purge. if 1 -> helm install
-func (r *ResourceScaler) SetScale(logger logger.Logger, namespace string, resource scaler.Resource, scaling int) error {
+func (r *AppResourceScaler) SetScale(logger logger.Logger, namespace string, resource scaler.Resource, scaling int) error {
 	if scaling == 0 {
 		if err := r.saveResourceData(logger, resource); err != nil {
 			return errors.Wrap(err, "Failed setting resource")
@@ -50,12 +46,12 @@ func (r *ResourceScaler) SetScale(logger logger.Logger, namespace string, resour
 	return nil
 }
 
-func (r *ResourceScaler) GetResources() ([]scaler.Resource, error) {
+func (r *AppResourceScaler) GetResources(namespace string) ([]scaler.Resource, error) {
 	r.helmClient.ListReleases()
 	return []scaler.Resource{"jupyter"}, nil
 }
 
-func (r *ResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
+func (r *AppResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
 
 	//// Autoscaler options definition
 	//scaleInterval, err := time.ParseDuration(os.Getenv("AUTOSCALER_SCALE_INTERVAL"))
@@ -114,6 +110,7 @@ func (r *ResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
 	//	PollerOptions:     pollerOptions,
 	//	DLXOptions:        dlxOptions,
 	//}, nil
+
 	return nil, nil
 }
 
@@ -125,7 +122,7 @@ func (r *ResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
 //	return value
 //}
 
-func (r *ResourceScaler) saveResourceData(logger logger.Logger, resource scaler.Resource) error {
+func (r *AppResourceScaler) saveResourceData(logger logger.Logger, resource scaler.Resource) error {
 	// clean previous data
 	r.releases = r.releases[:0]
 
