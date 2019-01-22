@@ -1,6 +1,7 @@
 package resourcescaler
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -10,11 +11,17 @@ import (
 	"github.com/v3io/scaler/pkg"
 
 	"k8s.io/helm/pkg/helm"
+	hapi_chart3 "k8s.io/helm/pkg/proto/hapi/chart"
 )
 
 type ResourceScaler struct {
 	helmClient *helm.Client
 	namespace  string
+	releases   []*releaseData
+}
+
+type releaseData struct {
+	chart *hapi_chart3.Chart
 }
 
 func New() *ResourceScaler {
@@ -25,18 +32,24 @@ func New() *ResourceScaler {
 	return &ResourceScaler{
 		helmClient: helmClient,
 		namespace:  namespace,
+		releases:   make([]*releaseData, 0),
 	}
 }
 
-func (r *ResourceScaler) SetScale(logger.Logger, string, scaler.Resource, int) error {
-	// if last int parameter is 0 -> helm del --purge. if 1 -> helm install
-	resources, _ := r.GetResources()
+// if last int parameter is 0 -> helm del --purge. if 1 -> helm install
+func (r *ResourceScaler) SetScale(logger logger.Logger, namespace string, resource scaler.Resource, scaling int) error {
+	if scaling == 0 {
+		if err := r.saveResourceData(logger, resource); err != nil {
+			return errors.Wrap(err, "Failed setting resource")
+		}
 
-	listNamespace := helm.ReleaseListNamespace(r.namespace)
-	listFilter := helm.ReleaseListFilter(string(resources[0]))
-	listedReleases, err := r.helmClient.ListReleases(listNamespace, listFilter)
-	if err != nil {
-		return errors.Wrap(err, "Failed to get listed releases")
+		deleteResponse, err := r.helmClient.DeleteRelease(string(resource))
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Failed to delete release %s", string(resource)))
+		}
+		logger.InfoWith("Release deleted successfully", "release_name", resource, "delete_response", deleteResponse)
+	} else {
+		//TBD
 	}
 
 	return nil
@@ -113,4 +126,28 @@ func getenv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func (r *ResourceScaler) saveResourceData(logger logger.Logger, resource scaler.Resource) error {
+	// clean previous data
+	r.releases = r.releases[:0]
+
+	// get required values
+	listNamespace := helm.ReleaseListNamespace(r.namespace)
+	listFilter := helm.ReleaseListFilter(string(resource))
+	listedReleases, err := r.helmClient.ListReleases(listNamespace, listFilter)
+
+	if err != nil {
+		return errors.Wrap(err, "Failed to get listed releases")
+	}
+
+	for _, release := range listedReleases.GetReleases() {
+		logger.DebugWith("Saving release data for later use", "release_name", release.Name)
+		singleReleaseData := &releaseData{
+			chart: release.Chart,
+		}
+		r.releases = append(r.releases, singleReleaseData)
+	}
+
+	return nil
 }
