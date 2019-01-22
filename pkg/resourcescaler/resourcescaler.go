@@ -2,21 +2,16 @@ package resourcescaler
 
 import (
 	"fmt"
-	"os"
-	"strconv"
-	"time"
-
 	"github.com/nuclio/errors"
 	"github.com/nuclio/logger"
 	"github.com/v3io/scaler/pkg"
-
 	"k8s.io/helm/pkg/helm"
 	hapi_chart3 "k8s.io/helm/pkg/proto/hapi/chart"
 )
 
 type ResourceScaler struct {
 	helmClient *helm.Client
-	namespace  string
+	//namespace  string
 	releases   []*releaseData
 }
 
@@ -25,13 +20,13 @@ type releaseData struct {
 }
 
 func New() *ResourceScaler {
-	namespace := getenv("RESOURCE_NAMESPACE", "default-tenant")
+	//namespace := getenv("RESOURCE_NAMESPACE", "default-tenant")
 
 	helmClient := helm.NewClient()
 
 	return &ResourceScaler{
 		helmClient: helmClient,
-		namespace:  namespace,
+		//namespace:  namespace,
 		releases:   make([]*releaseData, 0),
 	}
 }
@@ -56,77 +51,79 @@ func (r *ResourceScaler) SetScale(logger logger.Logger, namespace string, resour
 }
 
 func (r *ResourceScaler) GetResources() ([]scaler.Resource, error) {
+	r.helmClient.ListReleases()
 	return []scaler.Resource{"jupyter"}, nil
 }
 
 func (r *ResourceScaler) GetConfig() (*scaler.ResourceScalerConfig, error) {
 
-	// Autoscaler options definition
-	scaleInterval, err := time.ParseDuration(os.Getenv("AUTOSCALER_SCALE_INTERVAL"))
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to parse autoscaler scale interval")
-	}
-
-	scaleWindow, err := time.ParseDuration(os.Getenv("AUTOSCALER_SCALE_WINDOW"))
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to parse autoscaler scale window")
-	}
-
-	threshold, err := strconv.Atoi(os.Getenv("AUTOSCALER_THRESHOLD"))
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to parse autoscaler threshold")
-	}
-
-	autoscalerOptions := scaler.AutoScalerOptions{
-		Namespace:     r.namespace,
-		ScaleInterval: scaleInterval,
-		ScaleWindow:   scaleWindow,
-		MetricName:    os.Getenv("AUTOSCALER_METRIC_NAME"),
-		Threshold:     int64(threshold),
-	}
-
-	// Poller options definitions
-	pollerMetricInterval, err := time.ParseDuration(os.Getenv("POLLER_METRIC_INTERVAL"))
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to parse poller metric interval")
-	}
-
-	pollerOptions := scaler.PollerOptions{
-		MetricInterval: pollerMetricInterval,
-		MetricName:     os.Getenv("POLLER_METRIC_NAME"),
-		Namespace:      r.namespace,
-	}
-
-	// DLX options definition
-	targetPort, err := strconv.Atoi(os.Getenv("DLX_TARGET_PORT"))
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to parse dlx target port")
-	}
-
-	dlxOptions := scaler.DLXOptions{
-		Namespace:        r.namespace,
-		TargetNameHeader: os.Getenv("DLX_TARGET_NAME_HEADER"),
-		TargetPathHeader: os.Getenv("DLX_TARGET_PATH_HEADER"),
-		TargetPort:       targetPort,
-		ListenAddress:    os.Getenv("DLX_LISTEN_ADDRESS"),
-	}
-
-	// Now combine everything
-	return &scaler.ResourceScalerConfig{
-		KubeconfigPath:    os.Getenv("KUBECONFIG_PATH"),
-		AutoScalerOptions: autoscalerOptions,
-		PollerOptions:     pollerOptions,
-		DLXOptions:        dlxOptions,
-	}, nil
+	//// Autoscaler options definition
+	//scaleInterval, err := time.ParseDuration(os.Getenv("AUTOSCALER_SCALE_INTERVAL"))
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "Failed to parse autoscaler scale interval")
+	//}
+	//
+	//scaleWindow, err := time.ParseDuration(os.Getenv("AUTOSCALER_SCALE_WINDOW"))
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "Failed to parse autoscaler scale window")
+	//}
+	//
+	//threshold, err := strconv.Atoi(os.Getenv("AUTOSCALER_THRESHOLD"))
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "Failed to parse autoscaler threshold")
+	//}
+	//
+	//autoscalerOptions := scaler.AutoScalerOptions{
+	//	Namespace:     r.namespace,
+	//	ScaleInterval: scaleInterval,
+	//	ScaleWindow:   scaleWindow,
+	//	MetricName:    os.Getenv("AUTOSCALER_METRIC_NAME"),
+	//	Threshold:     int64(threshold),
+	//}
+	//
+	//// Poller options definitions
+	//pollerMetricInterval, err := time.ParseDuration(os.Getenv("POLLER_METRIC_INTERVAL"))
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "Failed to parse poller metric interval")
+	//}
+	//
+	//pollerOptions := scaler.PollerOptions{
+	//	MetricInterval: pollerMetricInterval,
+	//	MetricName:     os.Getenv("POLLER_METRIC_NAME"),
+	//	Namespace:      r.namespace,
+	//}
+	//
+	//// DLX options definition
+	//targetPort, err := strconv.Atoi(os.Getenv("DLX_TARGET_PORT"))
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "Failed to parse dlx target port")
+	//}
+	//
+	//dlxOptions := scaler.DLXOptions{
+	//	Namespace:        r.namespace,
+	//	TargetNameHeader: os.Getenv("DLX_TARGET_NAME_HEADER"),
+	//	TargetPathHeader: os.Getenv("DLX_TARGET_PATH_HEADER"),
+	//	TargetPort:       targetPort,
+	//	ListenAddress:    os.Getenv("DLX_LISTEN_ADDRESS"),
+	//}
+	//
+	//// Now combine everything
+	//return &scaler.ResourceScalerConfig{
+	//	KubeconfigPath:    os.Getenv("KUBECONFIG_PATH"),
+	//	AutoScalerOptions: autoscalerOptions,
+	//	PollerOptions:     pollerOptions,
+	//	DLXOptions:        dlxOptions,
+	//}, nil
+	return nil, nil
 }
 
-func getenv(key, fallback string) string {
-	value := os.Getenv(key)
-	if len(value) == 0 {
-		return fallback
-	}
-	return value
-}
+//func getenv(key, fallback string) string {
+//	value := os.Getenv(key)
+//	if len(value) == 0 {
+//		return fallback
+//	}
+//	return value
+//}
 
 func (r *ResourceScaler) saveResourceData(logger logger.Logger, resource scaler.Resource) error {
 	// clean previous data
