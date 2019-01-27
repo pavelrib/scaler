@@ -21,20 +21,29 @@ type AppResourceScaler struct {
 	kubeClientSet kubernetes.Interface
 }
 
-func New() scaler_types.ResourceScaler {
+func New() (scaler_types.ResourceScaler, error) {
 	helmClient := helm.NewClient()
+
+	rLogger, err := nucliozap.NewNuclioZap("resourcescaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed creating a new logger")
+	}
+
 	kubeconfig, err := rest.InClusterConfig()
 	if err != nil {
-		return errors.Wrap(err, "Failed getting cluster kube config")
+		return nil, errors.Wrap(err, "Failed getting cluster's kubeconfig")
 	}
-	rLogger, err := nucliozap.NewNuclioZap("autoscaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 
+	kubeClientSet, err := kubernetes.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed creating kubeclient from kubeconfig")
+	}
 
 	return &AppResourceScaler{
 		logger:        rLogger,
 		helmClient:    helmClient,
-		kubeClientSet: kubernetes.NewForConfig(kubeconfig),
-	}
+		kubeClientSet: kubeClientSet,
+	}, nil
 }
 
 // if last int parameter is 0 -> helm del --purge. if 1 -> helm install
@@ -47,6 +56,7 @@ func (s *AppResourceScaler) SetScale(namespace string, resource scaler_types.Res
 		return errors.Wrap(err, "Failed getting deployment instance")
 	}
 
+	// set deployment num of replicas by scaling factor (0/1)
 	int32scaling := int32(scaling)
 	deployment.Spec.Replicas = &int32scaling
 	_, err = s.kubeClientSet.AppsV1beta1().Deployments(namespace).Update(deployment)
