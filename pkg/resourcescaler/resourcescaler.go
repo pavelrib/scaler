@@ -11,6 +11,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/helm/pkg/helm"
 	"k8s.io/helm/pkg/proto/hapi/release"
 )
@@ -18,8 +19,8 @@ import (
 type AppResourceScaler struct {
 	logger        logger.Logger
 	namespace     string
-	helmClient    *helm.Client
 	kubeClientSet kubernetes.Interface
+	helmClient    *helm.Client
 }
 
 func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, error) {
@@ -30,7 +31,7 @@ func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, 
 		return nil, errors.Wrap(err, "Failed creating a new logger")
 	}
 
-	kubeconfig, err := rest.InClusterConfig()
+	kubeconfig, err := getClientConfig(kubeconfigPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed getting cluster's kubeconfig")
 	}
@@ -42,8 +43,9 @@ func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, 
 
 	return &AppResourceScaler{
 		logger:        rLogger,
-		helmClient:    helmClient,
+		namespace:     namespace,
 		kubeClientSet: kubeClientSet,
+		helmClient:    helmClient,
 	}, nil
 }
 
@@ -97,4 +99,12 @@ func allReleaseStatuses() []release.Status_Code {
 		statusCodes = append(statusCodes, release.Status_Code(statusCodeValue))
 	}
 	return statusCodes
+}
+
+func getClientConfig(kubeconfigPath string) (*rest.Config, error) {
+	if kubeconfigPath != "" {
+		return clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	}
+
+	return rest.InClusterConfig()
 }
