@@ -17,11 +17,12 @@ import (
 
 type AppResourceScaler struct {
 	logger        logger.Logger
+	namespace     string
 	helmClient    *helm.Client
 	kubeClientSet kubernetes.Interface
 }
 
-func New() (scaler_types.ResourceScaler, error) {
+func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, error) {
 	helmClient := helm.NewClient()
 
 	rLogger, err := nucliozap.NewNuclioZap("resourcescaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
@@ -47,10 +48,10 @@ func New() (scaler_types.ResourceScaler, error) {
 }
 
 // if last int parameter is 0 -> helm del --purge. if 1 -> helm install
-func (s *AppResourceScaler) SetScale(namespace string, resource scaler_types.Resource, scaling int) error {
+func (s *AppResourceScaler) SetScale(resource scaler_types.Resource, scaling int) error {
 
 	// get deployment by resource name
-	deployment, err := s.kubeClientSet.AppsV1beta1().Deployments(namespace).Get(string(resource), meta_v1.GetOptions{})
+	deployment, err := s.kubeClientSet.AppsV1beta1().Deployments(s.namespace).Get(string(resource), meta_v1.GetOptions{})
 	if err != nil {
 		s.logger.WarnWith("Failure during retrieval of deployment", "resource_name", string(resource))
 		return errors.Wrap(err, "Failed getting deployment instance")
@@ -59,7 +60,7 @@ func (s *AppResourceScaler) SetScale(namespace string, resource scaler_types.Res
 	// set deployment num of replicas by scaling factor (0/1)
 	int32scaling := int32(scaling)
 	deployment.Spec.Replicas = &int32scaling
-	_, err = s.kubeClientSet.AppsV1beta1().Deployments(namespace).Update(deployment)
+	_, err = s.kubeClientSet.AppsV1beta1().Deployments(s.namespace).Update(deployment)
 	if err != nil {
 		s.logger.WarnWith("Failure during update of deployment", "resource_name", string(resource))
 		return errors.Wrap(err, "Failed updating deployment instance")
@@ -68,10 +69,10 @@ func (s *AppResourceScaler) SetScale(namespace string, resource scaler_types.Res
 	return nil
 }
 
-func (s *AppResourceScaler) GetResources(namespace string) ([]scaler_types.Resource, error) {
+func (s *AppResourceScaler) GetResources() ([]scaler_types.Resource, error) {
 	resources := make([]scaler_types.Resource, 0)
 
-	listNamespace := helm.ReleaseListNamespace(namespace)
+	listNamespace := helm.ReleaseListNamespace(s.namespace)
 	allStatuses := helm.ReleaseListStatuses(allReleaseStatuses())
 	listedReleases, err := s.helmClient.ListReleases(listNamespace, allStatuses)
 	if err != nil {
