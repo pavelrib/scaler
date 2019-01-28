@@ -12,20 +12,15 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/helm/pkg/helm"
-	"k8s.io/helm/pkg/proto/hapi/release"
 )
 
 type AppResourceScaler struct {
 	logger        logger.Logger
 	namespace     string
 	kubeClientSet kubernetes.Interface
-	helmClient    *helm.Client
 }
 
 func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, error) {
-	helmClient := helm.NewClient()
-
 	rLogger, err := nucliozap.NewNuclioZap("resourcescaler", "console", os.Stdout, os.Stderr, nucliozap.DebugLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed creating a new logger")
@@ -45,11 +40,9 @@ func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, 
 		logger:        rLogger,
 		namespace:     namespace,
 		kubeClientSet: kubeClientSet,
-		helmClient:    helmClient,
 	}, nil
 }
 
-// if last int parameter is 0 -> helm del --purge. if 1 -> helm install
 func (s *AppResourceScaler) SetScale(resource scaler_types.Resource, scaling int) error {
 
 	// get deployment by resource name
@@ -74,16 +67,14 @@ func (s *AppResourceScaler) SetScale(resource scaler_types.Resource, scaling int
 func (s *AppResourceScaler) GetResources() ([]scaler_types.Resource, error) {
 	resources := make([]scaler_types.Resource, 0)
 
-	listNamespace := helm.ReleaseListNamespace(s.namespace)
-	allStatuses := helm.ReleaseListStatuses(allReleaseStatuses())
-	listedReleases, err := s.helmClient.ListReleases(listNamespace, allStatuses)
+	deploymentsList, err := s.kubeClientSet.AppsV1beta1().Deployments(s.namespace).List(meta_v1.ListOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to get listed releases")
 	}
 
-	// return the names of all releases
-	for _, releaseInst := range listedReleases.GetReleases() {
-		resources = append(resources, scaler_types.Resource(releaseInst.Name))
+	// return the names of all deployments
+	for _, deployment := range deploymentsList.Items {
+		resources = append(resources, scaler_types.Resource(deployment.Name))
 	}
 
 	return resources, nil
@@ -91,14 +82,6 @@ func (s *AppResourceScaler) GetResources() ([]scaler_types.Resource, error) {
 
 func (s *AppResourceScaler) GetConfig() (*scaler_types.ResourceScalerConfig, error) {
 	return nil, nil
-}
-
-func allReleaseStatuses() []release.Status_Code {
-	statusCodes := make([]release.Status_Code, 0)
-	for statusCodeValue := range release.Status_Code_name {
-		statusCodes = append(statusCodes, release.Status_Code(statusCodeValue))
-	}
-	return statusCodes
 }
 
 func getClientConfig(kubeconfigPath string) (*rest.Config, error) {
