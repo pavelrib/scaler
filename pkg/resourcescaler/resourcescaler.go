@@ -28,7 +28,8 @@ func New(kubeconfigPath string, namespace string) (scaler_types.ResourceScaler, 
 
 	kubeconfig, err := getClientConfig(kubeconfigPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed getting cluster's kubeconfig")
+		rLogger.WarnWith("Could not parse kubeconfig from path", "kubeconfigPath", kubeconfigPath)
+		return nil, errors.Wrap(err, "Failed parsing cluster's kubeconfig from path")
 	}
 
 	kubeClientSet, err := kubernetes.NewForConfig(kubeconfig)
